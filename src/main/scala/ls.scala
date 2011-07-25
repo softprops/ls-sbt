@@ -1,56 +1,39 @@
 package implicitly
 
 import sbt._
+import Keys._
 
-object Ls {
-  val LsPath = "ls.json"
-}
+object LS extends Plugin {
 
-trait Listing extends Project {
-  import Ls._
-  import Formatting._
-  import sbt.Path._
+  val ls = config("ls") extend(Runtime)
 
-  implicit def o2t(o: Option[String]) = task { o }
+  val lsVersion = SettingKey[String]("version", "version descriptor file to write to")
+  val path = SettingKey[java.io.File]("ls-path", "...")
+  val writeVersion = TaskKey[Unit]("write-version", "writes version data to descriptor file")
 
-  lazy val writeLs = task { _ match {
-    case Array(desc) =>
-      val ls = (this.info.projectPath / LsPath).asFile
-      log.info("write implicitly listing to %s" format ls)
-      FileUtilities.write(ls, Formatting(this,None), log)
-      None
-    case _ =>
-      val ls = (this.info.projectPath / LsPath).asFile
-      log.info("write implicitly listing to %s" format ((this.info.projectPath / LsPath).asFile.getClass()))
-      FileUtilities.write(ls, Formatting(this,None), log)
-      None
-  } } describedAs(
-    "Writes new implicitly ls metadata"
-  )
-
-  lazy val previewLs = task { _ match {
-    case Array(desc) =>
-      val rep = Formatting(this, Some(desc))
-      println(rep)
-      None
-    case _ =>
-      val rep = Formatting(this, None)
-      println(rep)
-      None
-  } } describedAs(
-    "Preview implicitly ls metadata"
-  )
-
-  lazy val publishLs = task { _ match {
-    case Array(desc) =>
-      Git.status(log) { lines =>
-        println("lines %s" format lines)
+  def lsSettings: Seq[Setting[_]] = inConfig(ls)(Seq(
+    lsVersion <<= (version)(_.replace("-SNAPSHOT","")),
+    path <<= (sourceDirectory in Compile) { _ / "ls" },
+    // todo, we can't access `projects` here so how do we collect all metadata
+    writeVersion <<=
+      (path,
+       lsVersion,
+       name,
+       version,
+       organization,
+       resolvers,
+       streams) map { (bd, lv, n, v, o, rsvrs, out) =>
+         out.log.info("""would write to %s/%s.json ->
+           |{
+           | "organization":"%s",
+           | "name":"%s",
+           | "version":"%s",
+           | "description":"",
+           | "tags":[],
+           | "resolvers": %s
+           |}""".format(
+           bd.getPath, lv, o, n, v, rsvrs.map(_.toString).mkString("[",",","]")
+         ).stripMargin)
       }
-      None
-    case _ =>
-      Git.status(log) { println(_) }
-      None
-  } } describedAs(
-    "Publishes implicitly ls metadata"
-  )
+  ))
 }
