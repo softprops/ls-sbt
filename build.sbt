@@ -4,4 +4,4 @@ organization := "me.lessis"
 
 name := "ls-sbt"
 
-version := "0.1.0-SNAPSHOT"
+version <<= sbtVersion("0.1.0-%s-SNAPSHOT" format _)
